@@ -1,0 +1,394 @@
+# Architecture
+
+This document describes the internal architecture of `agent-observability`, a framework-agnostic SDK that instruments AI agent frameworks with OpenTelemetry traces and metrics.
+
+## Design Goals
+
+1. **Framework-agnostic** - A single canonical event protocol that every framework adapter maps to, regardless of whether the framework uses callbacks, hooks, context managers, or event streams.
+2. **Correct span parenting** - Concurrent tool calls, out-of-order events, and async execution must produce accurate parent-child span trees.
+3. **Production-safe payloads** - PII, credentials, and large payloads are sanitized before reaching any exporter.
+4. **Zero framework dependencies** - The core SDK depends only on `opentelemetry-api` and `opentelemetry-sdk`. Each framework adapter is an optional extra.
+
+## Three-Layer Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                   Framework Adapters                     │
+│  LangChain │ OpenAI │ Anthropic │ CrewAI │ AutoGen │ …  │
+│                                                          │
+│  Translate framework hooks/callbacks into AgentEvents    │
+└──────────────────────────┬──────────────────────────────┘
+                           │  emit(AgentEvent)
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│                    AgentObserver                          │
+│                                                          │
+│  Event protocol  →  OTel spans + metrics                 │
+│  Correlation IDs →  Parent-child relationships            │
+│  PayloadPolicy   →  Redaction & truncation               │
+└──────────────────────────┬──────────────────────────────┘
+                           │  OTel SDK
+                           ▼
+┌─────────────────────────────────────────────────────────┐
+│               OpenTelemetry Exporters                    │
+│  Console │ OTLP/gRPC │ OTLP/HTTP                        │
+│                                                          │
+│  → Jaeger, Grafana Tempo, Datadog, New Relic, etc.       │
+└─────────────────────────────────────────────────────────┘
+```
+
+### Layer 1: Event Protocol (`events.py`)
+
+The event protocol is a frozen dataclass that serves as the stable contract between adapters and the observer.
+
+```python
+@dataclass(frozen=True)
+class AgentEvent:
+    name: EventName          # What happened (enum)
+    agent_id: str            # Which agent
+    run_id: str              # Which invocation
+
+    # Correlation IDs (for span parenting)
+    step_id: Optional[str]
+    tool_call_id: Optional[str]
+    llm_call_id: Optional[str]
+
+    # Metadata
+    tool_name: Optional[str]
+    model_name: Optional[str]
+    ok: Optional[bool]
+    error_type: Optional[str]
+    error_message: Optional[str]
+    attributes: dict[str, Any]   # Framework-specific payload
+
+    # Auto-populated
+    ts_ns: int                   # Nanosecond timestamp
+    event_id: str                # Unique event ID
+```
+
+**11 canonical event names:**
+
+| Event | Description |
+|---|---|
+| `agent.lifecycle.start` | Agent invocation begins |
+| `agent.lifecycle.end` | Agent invocation completes |
+| `agent.step.start` | Reasoning iteration begins |
+| `agent.step.end` | Reasoning iteration completes |
+| `agent.tool.call.start` | Tool invocation begins |
+| `agent.tool.call.end` | Tool invocation completes |
+| `agent.llm.call.start` | LLM call begins |
+| `agent.llm.call.end` | LLM call completes |
+| `agent.memory.read` | Memory/knowledge retrieval |
+| `agent.memory.write` | Memory/knowledge storage |
+| `agent.error` | Error occurred |
+
+**Why frozen dataclasses?** Events are immutable once created. This prevents accidental mutation during async processing and makes events safe to pass across thread boundaries.
+
+**Why correlation IDs instead of OTel context?** OTel's implicit "current span" context (`Context.attach`) is thread-local and breaks in several agent scenarios:
+- Concurrent tool calls within a single step
+- Out-of-order event delivery (DAG execution in LangGraph)
+- Async frameworks where `await` switches coroutines
+- Multi-agent handoffs where agent B runs inside agent A's context
+
+Correlation IDs (`run_id`, `step_id`, `tool_call_id`, `llm_call_id`) let the observer look up the correct parent span explicitly, regardless of thread/coroutine state.
+
+### Layer 2: Observer (`observer.py`)
+
+The observer is the OTel bridge. It consumes `AgentEvent` instances and produces OpenTelemetry spans and metrics.
+
+#### Span Hierarchy
+
+Every agent invocation produces a tree of spans:
+
+```
+agent.run  (keyed by run_id)
+  ├── agent.step  (keyed by step_id, parent = run)
+  │     ├── agent.tool  (keyed by tool_call_id, parent = step)
+  │     ├── agent.tool  (concurrent tool call, same parent)
+  │     └── agent.llm   (keyed by llm_call_id, parent = step)
+  └── agent.step  (second reasoning iteration)
+        └── agent.llm
+```
+
+#### Span Tracking
+
+Spans are stored in four dictionaries, keyed by correlation ID:
+
+```python
+_run_spans:  dict[str, _SpanHandle]   # run_id    → span
+_step_spans: dict[str, _SpanHandle]   # step_id   → span
+_tool_spans: dict[str, _SpanHandle]   # tool_call_id → span
+_llm_spans:  dict[str, _SpanHandle]   # llm_call_id  → span
+```
+
+A `_SpanHandle` bundles the OTel `Span`, its `Context`, and the context token for cleanup:
+
+```python
+class _SpanHandle:
+    span: Span
+    context_token: object
+    otel_context: Context
+```
+
+When a `*_START` event arrives, the observer:
+1. Looks up the parent span's `Context` by correlation ID
+2. Creates a new span with `context=parent_ctx` (explicit parenting)
+3. Stores the new span handle in the appropriate dictionary
+
+When a `*_END` event arrives, the observer:
+1. Pops the span handle from the dictionary
+2. Sets final attributes and status
+3. Ends the span and detaches the context
+
+#### Handler Dispatch
+
+Events are routed through a static dispatch table, avoiding long `if/elif` chains:
+
+```python
+_HANDLERS = {
+    EventName.LIFECYCLE_START: _on_lifecycle_start,
+    EventName.LIFECYCLE_END:   _on_lifecycle_end,
+    EventName.STEP_START:      _on_step_start,
+    EventName.STEP_END:        _on_step_end,
+    EventName.TOOL_CALL_START: _on_tool_start,
+    EventName.TOOL_CALL_END:   _on_tool_end,
+    EventName.LLM_CALL_START:  _on_llm_start,
+    EventName.LLM_CALL_END:    _on_llm_end,
+    EventName.MEMORY_READ:     _on_memory,
+    EventName.MEMORY_WRITE:    _on_memory,
+    EventName.ERROR:           _on_error,
+}
+```
+
+#### Metrics
+
+The observer creates counters and histograms on initialization:
+
+| Metric | Type | Labels |
+|---|---|---|
+| `agent.runs.total` | Counter | `agent.id` |
+| `agent.steps.total` | Counter | `agent.id` |
+| `agent.tool_calls.total` | Counter | `agent.id`, `tool.name` |
+| `agent.llm_calls.total` | Counter | `agent.id`, `model.name` |
+| `agent.errors.total` | Counter | `agent.id`, `error.type` |
+| `agent.run.duration_ms` | Histogram | `agent.id` |
+| `agent.step.duration_ms` | Histogram | `agent.id` |
+| `agent.tool_call.duration_ms` | Histogram | `agent.id`, `tool.name` |
+| `agent.llm_call.duration_ms` | Histogram | `agent.id`, `model.name` |
+
+Durations are computed from the span's `start_time` and the end event's `ts_ns`.
+
+#### Thread Safety
+
+All span dictionary operations are protected by a single `threading.Lock`. The lock is held only for dictionary reads and writes (microsecond-scale), not for span creation or OTel API calls. OTel's own `Context` is thread-local, so concurrent threads get isolated context stacks.
+
+#### Error Handling
+
+The `_on_error` handler attaches errors to the most specific active span using a priority search: `tool_call_id` > `llm_call_id` > `step_id` > `run_id`. This ensures errors are attributed to the correct scope even when events arrive out of order.
+
+### Layer 3: Payload Hygiene (`redaction.py`)
+
+All user-provided attributes pass through `PayloadPolicy` before reaching OTel span attributes.
+
+```python
+@dataclass
+class PayloadPolicy:
+    max_str_len: int = 4096              # Truncate long strings
+    max_attr_count: int = 64             # Cap attribute count
+    redact_patterns: list[Pattern]       # Regex patterns → [REDACTED]
+    redact_keys: set[str]                # Key names → [REDACTED]
+    allow_keys: set[str]                 # Allowlist (if non-empty)
+    drop_keys: set[str]                  # Silently dropped keys
+```
+
+**Processing order:**
+1. **Drop** keys in `drop_keys`
+2. **Allowlist** filter (if `allow_keys` is non-empty, only matching keys pass)
+3. **Redact by key** (case-insensitive match against `redact_keys`)
+4. **Redact by pattern** (regex substitution on string values)
+5. **Truncate** strings beyond `max_str_len`
+6. **Cap** total attribute count at `max_attr_count`
+
+**Default redaction patterns** catch common secrets:
+- Passwords, credentials, API keys, tokens
+- AWS access keys and secrets
+- Authorization/Bearer headers
+- Credit card numbers (basic 16-digit pattern)
+- Social Security Numbers
+
+**Sanitization ordering:** User attributes are sanitized *before* the `agent.attr.` prefix is applied. This ensures that key-based redaction (e.g., matching `"password"`) works on the original key name rather than `"agent.attr.password"`.
+
+### OTel Setup (`otel_setup.py`)
+
+The `init_telemetry()` function creates and registers the OTel `TracerProvider` and `MeterProvider` with a configured resource and exporter.
+
+Three exporter backends:
+
+| Type | Use Case | Dependencies |
+|---|---|---|
+| `CONSOLE` | Development, debugging | None (included in SDK) |
+| `OTLP_GRPC` | Production (gRPC) | `opentelemetry-exporter-otlp-proto-grpc` |
+| `OTLP_HTTP` | Production (HTTP fallback) | `opentelemetry-exporter-otlp-proto-http` |
+
+Environment variable support:
+- `OTEL_SERVICE_NAME` overrides the `service_name` argument
+- `OTEL_EXPORTER_OTLP_ENDPOINT` sets the OTLP endpoint
+- `OTEL_EXPORTER_OTLP_HEADERS` sets additional headers (comma-separated `key=value`)
+
+## Adapter Pattern
+
+Each adapter translates a framework's native instrumentation points into `AgentEvent` instances.
+
+### Integration Modes
+
+Adapters use one of two patterns depending on the framework's design:
+
+**1. Context Managers** (for frameworks with explicit control flow):
+```python
+with adapter.run(task="...") as run:
+    with run.step() as step:
+        with step.tool_call("search", input={...}) as tc:
+            result = search(...)
+            tc.set_output(result)
+```
+
+Used by: Generic, Anthropic (AgenticLoopAdapter), CrewAI, Google ADK, Smolagents, Haystack, PydanticAI, Phidata, AutoGen, Bedrock
+
+**2. Callback/Hook Implementation** (for frameworks with formal callback interfaces):
+```python
+class MyAdapter(FrameworkBaseCallback):
+    async def on_tool_start(self, tool, input):
+        self.observer.emit(AgentEvent(name=TOOL_CALL_START, ...))
+    async def on_tool_end(self, tool, output):
+        self.observer.emit(AgentEvent(name=TOOL_CALL_END, ...))
+```
+
+Used by: LangChain, LangGraph (callback), OpenAI Agents SDK, LlamaIndex, Semantic Kernel
+
+### Event Mapping
+
+Each framework's concepts map to the canonical event hierarchy:
+
+| Framework Concept | agent.run | agent.step | agent.tool | agent.llm |
+|---|---|---|---|---|
+| **LangChain** | Chain run | Agent action | Tool execution | LLM call |
+| **LangGraph** | Graph invocation | Node execution | Tool node | LLM node |
+| **OpenAI Agents** | Runner.run() | Agent turn | Tool execution | (via tool) |
+| **Anthropic Claude** | Agentic loop | Message turn | tool_use block | messages.create() |
+| **CrewAI** | Crew kickoff | Task execution | Tool use | (via task) |
+| **AutoGen** | Group chat | Agent message | Tool call | LLM call |
+| **Google ADK** | Agent run | Agent turn | Tool execution | Model call |
+| **Bedrock Agents** | Invocation | Orchestration step | Action group | Model invocation |
+| **LlamaIndex** | Query | Agent step | Function call | LLM predict |
+| **Semantic Kernel** | Function pipeline | Function invocation | Plugin function | Prompt render |
+| **Haystack** | Pipeline run | Generic component | Retriever | Generator |
+| **Smolagents** | Agent run | Step iteration | Tool execution | LLM call |
+| **PydanticAI** | Agent run | Step/iteration | Tool call | Model request |
+| **Phidata** | Agent run | (implicit) | Tool + knowledge | Model call |
+
+### Adapter Dependency Isolation
+
+Each adapter does a lazy import of its framework dependency:
+
+```python
+try:
+    from langchain_core.callbacks import BaseCallbackHandler
+    _LANGCHAIN_AVAILABLE = True
+except ImportError:
+    _LANGCHAIN_AVAILABLE = False
+```
+
+This means:
+- The core SDK has zero framework dependencies
+- Missing framework packages produce a clear `ImportError` at adapter instantiation, not at import time
+- Type stubs are provided for when the real package is absent
+
+## Data Flow
+
+End-to-end flow for a tool call:
+
+```
+1. Framework triggers callback
+      │
+2. Adapter creates AgentEvent(TOOL_CALL_START, tool_call_id="tc_abc")
+      │
+3. adapter calls observer.emit(event)
+      │
+4. Observer._HANDLERS routes to _on_tool_start()
+      │
+5. _on_tool_start():
+   a. Increments agent.tool_calls.total counter
+   b. Looks up parent step span via step_id
+   c. Starts new "agent.tool" span with parent=step_ctx
+   d. Stores _SpanHandle in _tool_spans["tc_abc"]
+      │
+6. Tool executes…
+      │
+7. Framework triggers callback with result
+      │
+8. Adapter creates AgentEvent(TOOL_CALL_END, tool_call_id="tc_abc", ok=True)
+      │
+9. observer.emit(event) → _on_tool_end():
+   a. Pops _SpanHandle from _tool_spans["tc_abc"]
+   b. Sanitizes attributes via PayloadPolicy
+   c. Sets span status (OK or ERROR)
+   d. Records duration in agent.tool_call.duration_ms histogram
+   e. Ends the span
+   f. Detaches OTel context
+      │
+10. OTel BatchSpanProcessor queues span for export
+      │
+11. Exporter sends to Jaeger/Grafana/Datadog/console
+```
+
+## File Structure
+
+```
+src/agent_observability/
+├── __init__.py              # Public API exports
+├── events.py                # AgentEvent + EventName enum
+├── observer.py              # AgentObserver (OTel bridge)
+├── redaction.py             # PayloadPolicy + sanitization
+├── otel_setup.py            # init_telemetry() + exporter config
+└── adapters/
+    ├── __init__.py           # Adapter catalog documentation
+    ├── generic.py            # Context-manager API for custom agents
+    ├── langchain.py          # LangChain BaseCallbackHandler
+    ├── langgraph.py          # LangGraph callback + event adapters
+    ├── crewai.py             # CrewAI crew/task/tool hooks
+    ├── openai_agents.py      # OpenAI Agents SDK RunHooks/AgentHooks
+    ├── anthropic_agents.py   # Anthropic Claude agentic loop
+    ├── autogen.py            # Microsoft AutoGen multi-agent
+    ├── llamaindex.py         # LlamaIndex callback handler
+    ├── semantic_kernel.py    # Semantic Kernel filters
+    ├── google_adk.py         # Google Agent Development Kit
+    ├── bedrock_agents.py     # Amazon Bedrock Agents
+    ├── smolagents.py         # HuggingFace smolagents
+    ├── haystack.py           # deepset Haystack pipeline
+    ├── pydantic_ai.py        # PydanticAI agent runs
+    └── phidata.py            # Phidata/Agno agent monitoring
+
+tests/
+├── conftest.py               # OTel test fixtures
+├── test_events.py            # Event protocol tests
+├── test_observer.py          # Observer span/metric tests
+├── test_redaction.py         # Redaction and sanitization tests
+└── test_adapters/
+    ├── test_generic.py
+    ├── test_anthropic.py
+    ├── test_autogen.py
+    └── test_remaining_adapters.py
+
+examples/
+└── demo.py                   # Working end-to-end demo
+```
+
+## Testing Strategy
+
+Tests use a custom `InMemorySpanExporter` that collects finished spans in a list. OTel providers are initialized once per test session (module-level singletons) and the exporter is cleared between tests via an autouse fixture. This avoids the OTel SDK limitation that `set_tracer_provider()` can only be called once per process.
+
+Each adapter test verifies:
+1. Correct span names are emitted (`agent.run`, `agent.step`, `agent.tool`, `agent.llm`)
+2. Parent-child relationships are correct (via span context)
+3. Error propagation sets `agent.ok = False` and span status to ERROR
+4. All spans are closed after the adapter finishes (`observer.open_span_count == 0`)
