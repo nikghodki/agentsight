@@ -1,6 +1,6 @@
 # Integration Guide
 
-Adding `agent-observability` to existing agent code is a minimal change. Your core agent logic stays untouched.
+Adding `agentsight` to existing agent code is a minimal change. Your core agent logic stays untouched.
 
 This guide covers two integration modes:
 1. **Auto-instrumentation** (one line, zero code changes) -- recommended for most users
@@ -13,7 +13,7 @@ This guide covers two integration modes:
 The fastest way to get started. One function call instruments all detected frameworks:
 
 ```python
-from agent_observability import auto_instrument
+from agentsight import auto_instrument
 
 auto_instrument()
 
@@ -29,7 +29,7 @@ crew.kickoff()                                # CrewAI ✓
 Instrument only specific frameworks:
 
 ```python
-from agent_observability import auto_instrument
+from agentsight import auto_instrument
 
 auto_instrument(frameworks=["langchain", "anthropic"])
 ```
@@ -37,7 +37,7 @@ auto_instrument(frameworks=["langchain", "anthropic"])
 Or use per-framework functions:
 
 ```python
-from agent_observability import instrument_langchain, instrument_anthropic
+from agentsight import instrument_langchain, instrument_anthropic
 
 instrument_langchain()
 instrument_anthropic()
@@ -46,8 +46,8 @@ instrument_anthropic()
 ### Configuration Options
 
 ```python
-from agent_observability import auto_instrument
-from agent_observability import ExporterType, PayloadPolicy
+from agentsight import auto_instrument
+from agentsight import ExporterType, PayloadPolicy
 
 results = auto_instrument(
     service_name="my-agent-service",
@@ -81,7 +81,7 @@ results = auto_instrument(
 ### Cleanup
 
 ```python
-from agent_observability import uninstrument
+from agentsight import uninstrument
 
 uninstrument()  # Remove all patches and flush telemetry
 ```
@@ -89,7 +89,7 @@ uninstrument()  # Remove all patches and flush telemetry
 ### Discover Available Frameworks
 
 ```python
-from agent_observability import available_frameworks
+from agentsight import available_frameworks
 
 print(available_frameworks())
 # ['langchain', 'anthropic', 'bedrock']  -- only installed ones
@@ -117,7 +117,7 @@ In all cases: **zero changes to your agent's core logic**. The observability lay
 Every manual integration starts with the same 3 lines:
 
 ```python
-from agent_observability import AgentObserver, init_telemetry, shutdown_telemetry
+from agentsight import AgentObserver, init_telemetry, shutdown_telemetry
 
 tp, mp = init_telemetry(service_name="my-agent")
 observer = AgentObserver()
@@ -179,7 +179,7 @@ def run_agent(task):
 
 ```python
 from anthropic import Anthropic
-from agent_observability.adapters.anthropic_agents import AgenticLoopAdapter     # <-- NEW
+from agentsight.adapters.anthropic_agents import AgenticLoopAdapter     # <-- NEW
 
 client = Anthropic()
 adapter = AgenticLoopAdapter(observer, agent_id="claude-agent")                  # <-- NEW
@@ -248,7 +248,7 @@ async def main():
 
 ```python
 from agents import Agent, Runner
-from agent_observability.adapters.openai_agents import OpenAIRunHooksAdapter     # <-- NEW
+from agentsight.adapters.openai_agents import OpenAIRunHooksAdapter     # <-- NEW
 
 hooks = OpenAIRunHooksAdapter(observer)                                          # <-- NEW
 
@@ -296,7 +296,7 @@ result = executor.invoke({"input": "What is the weather in SF?"})
 from langchain_openai import ChatOpenAI
 from langchain.agents import AgentExecutor, create_openai_tools_agent
 from langchain_core.prompts import ChatPromptTemplate
-from agent_observability.adapters.langchain import LangChainAdapter              # <-- NEW
+from agentsight.adapters.langchain import LangChainAdapter              # <-- NEW
 
 handler = LangChainAdapter(observer, agent_id="langchain-agent")                 # <-- NEW
 
@@ -346,7 +346,7 @@ result = app.invoke({"messages": [("user", "What is AI?")]})
 ```python
 from langgraph.graph import StateGraph, END
 from langchain_openai import ChatOpenAI
-from agent_observability.adapters.langgraph import LangGraphCallbackAdapter      # <-- NEW
+from agentsight.adapters.langgraph import LangGraphCallbackAdapter      # <-- NEW
 
 handler = LangGraphCallbackAdapter(observer, agent_id="my-graph")                # <-- NEW
 
@@ -396,7 +396,7 @@ result = crew.kickoff()
 
 ```python
 from crewai import Agent, Task, Crew
-from agent_observability.adapters.crewai import CrewAIAdapter                    # <-- NEW
+from agentsight.adapters.crewai import CrewAIAdapter                    # <-- NEW
 
 adapter = CrewAIAdapter(observer)                                                # <-- NEW
 
@@ -436,7 +436,7 @@ researcher.initiate_chat(manager, message="Find AI safety papers")
 
 ```python
 from autogen import ConversableAgent, GroupChat, GroupChatManager
-from agent_observability.adapters.autogen import AutoGenAdapter                  # <-- NEW
+from agentsight.adapters.autogen import AutoGenAdapter                  # <-- NEW
 
 adapter = AutoGenAdapter(observer)                                               # <-- NEW
 
@@ -482,7 +482,7 @@ async for event in runner.run_async(user_id="u1", session_id=session.id, new_mes
 ```python
 from google.adk import Agent, Runner
 from google.adk.sessions import InMemorySessionService
-from agent_observability.adapters.google_adk import GoogleADKAdapter             # <-- NEW
+from agentsight.adapters.google_adk import GoogleADKAdapter             # <-- NEW
 
 adapter = GoogleADKAdapter(observer)                                             # <-- NEW
 
@@ -528,7 +528,7 @@ for event in response["completion"]:
 
 ```python
 import boto3
-from agent_observability.adapters.bedrock_agents import BedrockAgentsAdapter     # <-- NEW
+from agentsight.adapters.bedrock_agents import BedrockAgentsAdapter     # <-- NEW
 
 adapter = BedrockAgentsAdapter(observer, agent_id="my-bedrock-agent")            # <-- NEW
 
@@ -573,7 +573,7 @@ print(response)
 ```python
 from llama_index.core import VectorStoreIndex, SimpleDirectoryReader
 from llama_index.core.callbacks import CallbackManager                           # <-- NEW
-from agent_observability.adapters.llamaindex import LlamaIndexAdapter            # <-- NEW
+from agentsight.adapters.llamaindex import LlamaIndexAdapter            # <-- NEW
 
 handler = LlamaIndexAdapter(observer, agent_id="rag-agent")                      # <-- NEW
 callback_manager = CallbackManager([handler])                                    # <-- NEW
@@ -614,7 +614,7 @@ print(result)
 ```python
 import semantic_kernel as sk
 from semantic_kernel.connectors.ai.open_ai import OpenAIChatCompletion
-from agent_observability.adapters.semantic_kernel import SKAdapter               # <-- NEW
+from agentsight.adapters.semantic_kernel import SKAdapter               # <-- NEW
 
 adapter = SKAdapter(observer, agent_id="sk-agent")                               # <-- NEW
 
@@ -662,7 +662,7 @@ print(result["generator"]["replies"][0])
 from haystack import Pipeline
 from haystack.components.retrievers import InMemoryBM25Retriever
 from haystack.components.generators import OpenAIGenerator
-from agent_observability.adapters.haystack import HaystackAdapter                # <-- NEW
+from agentsight.adapters.haystack import HaystackAdapter                # <-- NEW
 
 adapter = HaystackAdapter(observer, agent_id="rag-pipeline")                     # <-- NEW
 
@@ -708,7 +708,7 @@ print(result)
 
 ```python
 from smolagents import CodeAgent, DuckDuckGoSearchTool, HfApiModel
-from agent_observability.adapters.smolagents import SmolagentsAdapter            # <-- NEW
+from agentsight.adapters.smolagents import SmolagentsAdapter            # <-- NEW
 
 adapter = SmolagentsAdapter(observer, agent_id="code-agent")                     # <-- NEW
 monitor = adapter.create_monitor()                                               # <-- NEW
@@ -726,7 +726,7 @@ print(result)
 
 ```python
 from smolagents import CodeAgent, DuckDuckGoSearchTool, HfApiModel
-from agent_observability.adapters.smolagents import SmolagentsAdapter            # <-- NEW
+from agentsight.adapters.smolagents import SmolagentsAdapter            # <-- NEW
 
 adapter = SmolagentsAdapter(observer, agent_id="code-agent")                     # <-- NEW
 
@@ -757,7 +757,7 @@ print(result.data)
 
 ```python
 from pydantic_ai import Agent
-from agent_observability.adapters.pydantic_ai import PydanticAIAdapter           # <-- NEW
+from agentsight.adapters.pydantic_ai import PydanticAIAdapter           # <-- NEW
 
 adapter = PydanticAIAdapter(observer, agent_id="pydantic-agent")                 # <-- NEW
 
@@ -810,7 +810,7 @@ agent.print_response("What are the latest AI trends?")
 from phi.agent import Agent
 from phi.tools.duckduckgo import DuckDuckGo
 from phi.model.openai import OpenAIChat
-from agent_observability.adapters.phidata import PhidataAdapter                  # <-- NEW
+from agentsight.adapters.phidata import PhidataAdapter                  # <-- NEW
 
 adapter = PhidataAdapter(observer, agent_id="research-agent")                    # <-- NEW
 
@@ -864,7 +864,7 @@ def run_my_agent(task):
 ### After
 
 ```python
-from agent_observability.adapters.generic import GenericAgentAdapter              # <-- NEW
+from agentsight.adapters.generic import GenericAgentAdapter              # <-- NEW
 
 agent = GenericAgentAdapter(observer, agent_id="my-agent")                        # <-- NEW
 

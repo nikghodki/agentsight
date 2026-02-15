@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Demo: agent-observability SDK in action.
+Demo: agentsight SDK in action.
 
 Run with:
     python -m examples.demo
@@ -15,14 +15,14 @@ and set OTEL_EXPORTER_OTLP_ENDPOINT.
 
 import time
 
-from agent_observability import (
+from agentsight import (
     AgentObserver,
     ExporterType,
     PayloadPolicy,
     init_telemetry,
     shutdown_telemetry,
 )
-from agent_observability.adapters.generic import GenericAgentAdapter
+from agentsight.adapters.generic import GenericAgentAdapter
 
 
 def simulate_search(query: str) -> dict:

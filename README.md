@@ -1,14 +1,18 @@
-# agent-observability
+# AgentSight
 
 Framework-agnostic observability SDK for AI agents, built on OpenTelemetry.
 
 Instrument any agent framework with structured traces, metrics, and payload safety -- using a single canonical event protocol that works across 15+ frameworks.
 
+<p align="center">
+  <img src="assets/detailed_demo.gif" alt="AgentSight — Claude Agent SDK integration demo showing before/after code, traces, spans, and metrics" width="750">
+</p>
+
 ## Why
 
 AI agent frameworks each have their own callback systems, hook patterns, and logging approaches. Comparing traces across LangChain, OpenAI Agents, Anthropic Claude, CrewAI, and others requires a different integration for each.
 
-`agent-observability` provides:
+`agentsight` provides:
 
 - **One event protocol** that all frameworks map to
 - **Automatic span trees** with correct parent-child relationships (even for concurrent tool calls and async execution)
@@ -39,24 +43,24 @@ https://github.com/user-attachments/assets/621b4f29-b06f-4fc1-b146-1ea287feae34
 
 ```bash
 # Core SDK only
-pip install agent-observability
+pip install agentsight
 
 # With a framework adapter
-pip install agent-observability[langchain]
-pip install agent-observability[openai-agents]
-pip install agent-observability[crewai]
+pip install agentsight[langchain]
+pip install agentsight[openai-agents]
+pip install agentsight[crewai]
 
 # With OTLP export for production
-pip install agent-observability[otlp]
+pip install agentsight[otlp]
 
 # Everything
-pip install agent-observability[all]
+pip install agentsight[all]
 ```
 
 ## Quick Start — One Line
 
 ```python
-from agent_observability import auto_instrument
+from agentsight import auto_instrument
 
 auto_instrument()
 
@@ -70,7 +74,7 @@ crew.kickoff()                                # CrewAI ✓
 ### Selective or Production Setup
 
 ```python
-from agent_observability import auto_instrument, ExporterType, PayloadPolicy
+from agentsight import auto_instrument, ExporterType, PayloadPolicy
 
 auto_instrument(
     service_name="my-agent",
@@ -84,8 +88,8 @@ auto_instrument(
 ### Manual Integration (Full Control)
 
 ```python
-from agent_observability import AgentObserver, init_telemetry, shutdown_telemetry
-from agent_observability.adapters.generic import GenericAgentAdapter
+from agentsight import AgentObserver, init_telemetry, shutdown_telemetry
+from agentsight.adapters.generic import GenericAgentAdapter
 
 tp, mp = init_telemetry(service_name="my-agent")
 observer = AgentObserver()
@@ -128,7 +132,7 @@ shutdown_telemetry(tp, mp)
 Send traces and metrics to an OTLP collector:
 
 ```python
-from agent_observability import ExporterType, init_telemetry
+from agentsight import ExporterType, init_telemetry
 
 tp, mp = init_telemetry(
     service_name="production-agent",
@@ -149,7 +153,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
 Sensitive data is automatically redacted before reaching any exporter:
 
 ```python
-from agent_observability import AgentObserver, PayloadPolicy
+from agentsight import AgentObserver, PayloadPolicy
 
 observer = AgentObserver(
     payload_policy=PayloadPolicy(
@@ -181,7 +185,7 @@ The SDK automatically records:
 ## Project Structure
 
 ```
-src/agent_observability/
+src/agentsight/
   __init__.py          # Public API
   auto.py              # auto_instrument() orchestration
   _state.py            # Global singleton (observer, providers)

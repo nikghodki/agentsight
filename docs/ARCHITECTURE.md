@@ -1,6 +1,6 @@
 # Architecture
 
-This document describes the internal architecture of `agent-observability`, a framework-agnostic SDK that instruments AI agent frameworks with OpenTelemetry traces and metrics.
+This document describes the internal architecture of `agentsight`, a framework-agnostic SDK that instruments AI agent frameworks with OpenTelemetry traces and metrics.
 
 ## Design Goals
 
@@ -77,9 +77,9 @@ The `auto_instrument()` function maintains a framework registry:
 
 ```python
 _REGISTRY = {
-    "langchain":       ("langchain_core",    "agent_observability._patch.langchain"),
-    "anthropic":       ("anthropic",         "agent_observability._patch.anthropic"),
-    "crewai":          ("crewai",            "agent_observability._patch.crewai"),
+    "langchain":       ("langchain_core",    "agentsight._patch.langchain"),
+    "anthropic":       ("anthropic",         "agentsight._patch.anthropic"),
+    "crewai":          ("crewai",            "agentsight._patch.crewai"),
     # ... 14 frameworks total
 }
 ```
@@ -473,7 +473,7 @@ End-to-end flow for a tool call:
 ## File Structure
 
 ```
-src/agent_observability/
+src/agentsight/
 ├── __init__.py              # Public API exports (auto_instrument, adapters, core)
 ├── auto.py                  # auto_instrument() orchestration + framework registry
 ├── _state.py                # Global singleton (observer, OTel providers, tracking)

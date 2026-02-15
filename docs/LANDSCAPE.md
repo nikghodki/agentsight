@@ -1,6 +1,6 @@
 # Agent Observability Landscape
 
-A comprehensive survey of every library, framework, and platform that provides observability for AI agents and LLM applications -- and where `agent-observability` fits.
+A comprehensive survey of every library, framework, and platform that provides observability for AI agents and LLM applications -- and where `agentsight` fits.
 
 Last updated: February 2026
 
@@ -31,7 +31,7 @@ Last updated: February 2026
 - [Comparison Matrix](#comparison-matrix)
 - [Span Hierarchy Comparison](#span-hierarchy-comparison)
 - [Instrumentation Approach Comparison](#instrumentation-approach-comparison)
-- [Where agent-observability Fits](#where-agent-observability-fits)
+- [Where AgentSight Fits](#where-agentsight-fits)
 - [What Exists vs. What We Do Differently](#what-exists-vs-what-we-do-differently)
 - [Recommendations](#recommendations)
 
@@ -63,7 +63,7 @@ The closest tool is **OpenLLMetry** (6.8k GitHub stars), which is OTel-native an
 1. **OTel GenAI Semantic Conventions are becoming the standard.** OpenLLMetry's conventions were upstreamed to OTel. Logfire adopted `gen_ai.*` attributes. Microsoft/Cisco are collaborating on multi-agent conventions within OTel.
 2. **Multi-agent observability is the emerging frontier.** New OTel conventions define `agent_to_agent_interaction`, `agent_planning`, `agent_orchestration`, and `agent.state.management` spans.
 3. **MCP semantic conventions are now defined** in OTel v1.39.0, but no standalone instrumentation library exists yet.
-4. **Content redaction is still immature.** Only Datadog, Langfuse (server-side), and `agent-observability` offer meaningful redaction. Most tools rely on a binary content-capture toggle.
+4. **Content redaction is still immature.** Only Datadog, Langfuse (server-side), and `agentsight` offer meaningful redaction. Most tools rely on a binary content-capture toggle.
 5. **Auto-instrumentation is table stakes.** Every major tool now offers one-line setup.
 
 ---
@@ -96,7 +96,7 @@ The closest tool is **OpenLLMetry** (6.8k GitHub stars), which is OTel-native an
             |                              |                              |
    +--------v------------------------------v------------------------------v--------+
    |                                                                               |
-   |                     agent-observability (this project)                         |
+   |                     AgentSight (this project)                         |
    |                                                                               |
    |   auto_instrument() + 15 adapters + Unified event protocol +                  |
    |   Correlation-ID spans + Payload redaction                                    |
@@ -802,7 +802,7 @@ No widely adopted standalone MCP instrumentation library has emerged. The conven
 
 - OpenInference has MCP instrumentation in its Python and JS/TS packages
 - The conventions bridge MCP and GenAI telemetry through shared `gen_ai.tool.*` attributes
-- `agent-observability` instruments MCP tool calls through its framework adapters when agents use MCP tools
+- `agentsight` instruments MCP tool calls through its framework adapters when agents use MCP tools
 
 ---
 
@@ -895,7 +895,7 @@ Azure has the most advanced cloud-native offering, with Microsoft actively contr
 
 ## Comparison Matrix
 
-| Feature | OpenLLMetry | OpenInference | AgentOps | Langfuse | Opik | MLflow | Logfire | OpenLIT | **agent-observability** |
+| Feature | OpenLLMetry | OpenInference | AgentOps | Langfuse | Opik | MLflow | Logfire | OpenLIT | **AgentSight** |
 |---|---|---|---|---|---|---|---|---|---|
 | **GitHub Stars** | 6.8k | 855 | 5.3k | 21.9k | 17.7k | 24.1k | 4k | 2.2k | -- |
 | **Type** | SDK | SDK | Platform+SDK | Platform | Platform | Platform+SDK | Platform+SDK | Platform+SDK | **SDK** |
@@ -979,7 +979,7 @@ Session
        +-- Event (point-in-time)
 ```
 
-### agent-observability (this project)
+### AgentSight (this project)
 ```
 agent.run (keyed by run_id)
   +-- agent.step (keyed by step_id)
@@ -996,7 +996,7 @@ agent.run (keyed by run_id)
 
 ### Auto-Instrumentation (monkey-patching)
 
-Used by: OpenLLMetry, OpenInference, AgentOps, MLflow, Logfire, OpenLIT, **agent-observability**
+Used by: OpenLLMetry, OpenInference, AgentOps, MLflow, Logfire, OpenLIT, **AgentSight**
 
 ```python
 # One line instruments everything
@@ -1006,7 +1006,7 @@ mlflow.langchain.autolog()        # MLflow
 logfire.instrument_openai()       # Logfire
 agentops.init()                   # AgentOps
 OpenAIInstrumentor().instrument() # OpenInference
-auto_instrument()                 # agent-observability
+auto_instrument()                 # agentsight
 ```
 
 **Pros:** Zero code changes to existing agent logic. Instant observability.
@@ -1034,7 +1034,7 @@ def my_function():
 
 ### Callback/Hook Implementation
 
-Used by: agent-observability (LangChain, LangGraph, LlamaIndex adapters)
+Used by: agentsight (LangChain, LangGraph, LlamaIndex adapters)
 
 ```python
 handler = LangChainAdapter(observer, agent_id="my-agent")
@@ -1047,7 +1047,7 @@ result = chain.invoke(input, config={"callbacks": [handler]})
 
 ### Context Managers (Explicit Wrapping)
 
-Used by: agent-observability (Generic, Anthropic, CrewAI, AutoGen, Google ADK, Bedrock, Haystack, smolagents, PydanticAI, Phidata adapters)
+Used by: agentsight (Generic, Anthropic, CrewAI, AutoGen, Google ADK, Bedrock, Haystack, smolagents, PydanticAI, Phidata adapters)
 
 ```python
 with adapter.run(task="Book flight") as run:
@@ -1065,9 +1065,9 @@ with adapter.run(task="Book flight") as run:
 
 ---
 
-## Where agent-observability Fits
+## Where AgentSight Fits
 
-`agent-observability` bridges convenience and control:
+`agentsight` bridges convenience and control:
 
 ```
 +----------------------------------------------------------------+
@@ -1106,7 +1106,7 @@ with adapter.run(task="Book flight") as run:
 
 Our position: **Pure SDK with both auto and manual instrumentation, built-in payload safety, zero platform dependency.**
 
-Unlike other tools that force a choice between convenience (auto only) and control (manual only), `agent-observability` provides both:
+Unlike other tools that force a choice between convenience (auto only) and control (manual only), `agentsight` provides both:
 
 ```python
 # Quick start: one line, zero code changes
@@ -1135,7 +1135,7 @@ with adapter.run(task="...") as run:
 
 Every existing tool has independent per-framework instrumentors. OpenLLMetry's LangChain instrumentor knows nothing about its CrewAI instrumentor. They share OTel as an output format, but there is no intermediate representation.
 
-`agent-observability` has a single `AgentEvent` frozen dataclass that all 15 adapters map to:
+`agentsight` has a single `AgentEvent` frozen dataclass that all 15 adapters map to:
 
 ```
 LangChain callback  --+
@@ -1182,9 +1182,9 @@ No existing instrumentation SDK has fine-grained payload redaction built in. The
 | New Relic | Agent config toggle (`ai_monitoring.record_content.enabled: false`) |
 | Azure AI | Environment variable toggle |
 | OTel GenAI spec | Three-tier strategy but no implementation |
-| **agent-observability** | **Fine-grained SDK-level redaction before data leaves the process** |
+| **AgentSight** | **Fine-grained SDK-level redaction before data leaves the process** |
 
-`agent-observability` has `PayloadPolicy` at the SDK level:
+`agentsight` has `PayloadPolicy` at the SDK level:
 
 ```python
 observer = AgentObserver(
@@ -1218,7 +1218,7 @@ observer = AgentObserver(
 
 ## Recommendations
 
-### When to use agent-observability
+### When to use AgentSight
 
 - You need **both auto-instrumentation and manual control** over what gets instrumented
 - You run agents with **concurrent tool calls** or **async execution** where thread-local context breaks
@@ -1245,7 +1245,7 @@ observer = AgentObserver(
 
 ### Potential convergence
 
-The OTel GenAI Semantic Conventions (`gen_ai.*` namespace) are still in Development status but represent the standard the industry will converge on. A future version of `agent-observability` could:
+The OTel GenAI Semantic Conventions (`gen_ai.*` namespace) are still in Development status but represent the standard the industry will converge on. A future version of `agentsight` could:
 
 1. **Adopt `gen_ai.*` attributes** alongside or instead of `agent.*` -- map `AgentEvent` fields to `gen_ai.agent.id`, `gen_ai.usage.input_tokens`, `gen_ai.tool.name`, etc.
 2. **Adopt MCP conventions** -- emit `mcp.client.*` and `mcp.server.*` spans for MCP tool calls with `params._meta` context propagation
@@ -1253,4 +1253,4 @@ The OTel GenAI Semantic Conventions (`gen_ai.*` namespace) are still in Developm
 4. **Keep correlation-ID-based span parenting** -- complementary to semantic conventions, not conflicting
 5. **Keep `PayloadPolicy`** -- the OTel spec's three-tier content recording strategy has a similar model but no implementation. Our SDK-level redaction remains differentiated.
 
-This would give `agent-observability` the unique combination of **standard semantic conventions** + **correlation-ID spans** + **built-in redaction** -- a position no existing tool occupies.
+This would give `agentsight` the unique combination of **standard semantic conventions** + **correlation-ID spans** + **built-in redaction** -- a position no existing tool occupies.

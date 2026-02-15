@@ -9,7 +9,7 @@ import pytest
 if TYPE_CHECKING:
     from conftest import InMemorySpanExporter
 
-from agent_observability.events import (
+from agentsight.events import (
     AgentEvent,
     EventName,
     new_llm_call_id,
@@ -17,7 +17,7 @@ from agent_observability.events import (
     new_step_id,
     new_tool_call_id,
 )
-from agent_observability.observer import AgentObserver
+from agentsight.observer import AgentObserver
 
 
 class TestLifecycle:
@@ -270,7 +270,7 @@ class TestErrors:
 
 class TestPayloadSanitization:
     def test_attributes_are_sanitized(self, span_exporter: InMemorySpanExporter):
-        from agent_observability.redaction import PayloadPolicy
+        from agentsight.redaction import PayloadPolicy
 
         observer = AgentObserver(payload_policy=PayloadPolicy())
         run_id = new_run_id()

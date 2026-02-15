@@ -10,11 +10,11 @@ import pytest
 if TYPE_CHECKING:
     from conftest import InMemorySpanExporter
 
-from agent_observability.adapters.anthropic_agents import (
+from agentsight.adapters.anthropic_agents import (
     AgenticLoopAdapter,
     AnthropicMessageHooksAdapter,
 )
-from agent_observability.observer import AgentObserver
+from agentsight.observer import AgentObserver
 
 
 class TestAgenticLoopAdapter:

@@ -9,8 +9,8 @@ from unittest import mock
 
 import pytest
 
-from agent_observability._state import reset as reset_state
-from agent_observability.auto import (
+from agentsight._state import reset as reset_state
+from agentsight.auto import (
     _REGISTRY,
     _framework_available,
     auto_instrument,
@@ -69,7 +69,7 @@ class TestFrameworkDetection:
             assert len(entry) == 2, f"{name}: expected 2 elements"
             import_probe, patch_module = entry
             assert isinstance(import_probe, str)
-            assert patch_module.startswith("agent_observability._patch.")
+            assert patch_module.startswith("agentsight._patch.")
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +99,7 @@ class TestAutoInstrumentBasics:
     def test_unavailable_framework_returns_false(self):
         """When a framework's import probe fails, result is False."""
         with mock.patch(
-            "agent_observability.auto._framework_available", return_value=False
+            "agentsight.auto._framework_available", return_value=False
         ):
             result = auto_instrument(frameworks=["langchain"])
         assert result == {"langchain": False}
@@ -123,13 +123,13 @@ class TestAutoInstrumentWithMocks:
 
         with mock.patch.dict(sys.modules, {"langchain_core": mock.MagicMock()}):
             with mock.patch(
-                "agent_observability.auto.importlib.import_module"
+                "agentsight.auto.importlib.import_module"
             ) as mock_import:
                 # Return a real module for the probe, and our fake for the patch
                 def side_effect(name: str) -> Any:
                     if name == "langchain_core":
                         return mock.MagicMock()
-                    if name == "agent_observability._patch.langchain":
+                    if name == "agentsight._patch.langchain":
                         return fake_patch
                     return importlib.import_module(name)
 
@@ -147,12 +147,12 @@ class TestAutoInstrumentWithMocks:
 
         with mock.patch.dict(sys.modules, {"langchain_core": mock.MagicMock()}):
             with mock.patch(
-                "agent_observability.auto.importlib.import_module"
+                "agentsight.auto.importlib.import_module"
             ) as mock_import:
                 def side_effect(name: str) -> Any:
                     if name == "langchain_core":
                         return mock.MagicMock()
-                    if name == "agent_observability._patch.langchain":
+                    if name == "agentsight._patch.langchain":
                         return fake_patch
                     return importlib.import_module(name)
 
@@ -173,12 +173,12 @@ class TestAutoInstrumentWithMocks:
 
         with mock.patch.dict(sys.modules, {"anthropic": mock.MagicMock()}):
             with mock.patch(
-                "agent_observability.auto.importlib.import_module"
+                "agentsight.auto.importlib.import_module"
             ) as mock_import:
                 def side_effect(name: str) -> Any:
                     if name == "anthropic":
                         return mock.MagicMock()
-                    if name == "agent_observability._patch.anthropic":
+                    if name == "agentsight._patch.anthropic":
                         return fake_patch
                     return importlib.import_module(name)
 
@@ -200,14 +200,14 @@ class TestAutoInstrumentWithMocks:
             {"langchain_core": mock.MagicMock(), "anthropic": mock.MagicMock()},
         ):
             with mock.patch(
-                "agent_observability.auto.importlib.import_module"
+                "agentsight.auto.importlib.import_module"
             ) as mock_import:
                 def side_effect(name: str) -> Any:
                     mapping = {
                         "langchain_core": mock.MagicMock(),
                         "anthropic": mock.MagicMock(),
-                        "agent_observability._patch.langchain": fake_lc,
-                        "agent_observability._patch.anthropic": fake_anth,
+                        "agentsight._patch.langchain": fake_lc,
+                        "agentsight._patch.anthropic": fake_anth,
                     }
                     if name in mapping:
                         return mapping[name]
@@ -237,12 +237,12 @@ class TestUninstrument:
 
         with mock.patch.dict(sys.modules, {"crewai": mock.MagicMock()}):
             with mock.patch(
-                "agent_observability.auto.importlib.import_module"
+                "agentsight.auto.importlib.import_module"
             ) as mock_import:
                 def side_effect(name: str) -> Any:
                     if name == "crewai":
                         return mock.MagicMock()
-                    if name == "agent_observability._patch.crewai":
+                    if name == "agentsight._patch.crewai":
                         return fake_patch
                     return importlib.import_module(name)
 
@@ -266,7 +266,7 @@ class TestUninstrument:
 
 class TestPerFrameworkFunctions:
     def test_instrument_functions_exist(self):
-        from agent_observability.auto import (
+        from agentsight.auto import (
             instrument_anthropic,
             instrument_autogen,
             instrument_bedrock,
@@ -304,7 +304,7 @@ class TestPerFrameworkFunctions:
             assert callable(fn)
 
     def test_instrument_function_returns_false_when_not_installed(self):
-        from agent_observability.auto import instrument_google_adk
+        from agentsight.auto import instrument_google_adk
 
         # google.adk is not installed in the test environment
         result = instrument_google_adk()
@@ -318,19 +318,19 @@ class TestPerFrameworkFunctions:
 
 class TestExports:
     def test_auto_instrument_importable_from_top_level(self):
-        from agent_observability import auto_instrument as ai
+        from agentsight import auto_instrument as ai
         assert callable(ai)
 
     def test_uninstrument_importable_from_top_level(self):
-        from agent_observability import uninstrument as ui
+        from agentsight import uninstrument as ui
         assert callable(ui)
 
     def test_available_frameworks_importable_from_top_level(self):
-        from agent_observability import available_frameworks as af
+        from agentsight import available_frameworks as af
         assert callable(af)
 
     def test_per_framework_importable_from_top_level(self):
-        from agent_observability import (
+        from agentsight import (
             instrument_anthropic,
             instrument_langchain,
         )
@@ -345,21 +345,21 @@ class TestExports:
 
 class TestStateIntegration:
     def test_initialize_creates_observer(self):
-        from agent_observability._state import get_observer, initialize
+        from agentsight._state import get_observer, initialize
 
         obs = initialize()
         assert obs is not None
         assert get_observer() is obs
 
     def test_initialize_is_idempotent(self):
-        from agent_observability._state import initialize
+        from agentsight._state import initialize
 
         obs1 = initialize()
         obs2 = initialize()
         assert obs1 is obs2
 
     def test_mark_and_check_instrumented(self):
-        from agent_observability._state import (
+        from agentsight._state import (
             instrumented_frameworks,
             is_instrumented,
             mark_instrumented,
@@ -371,7 +371,7 @@ class TestStateIntegration:
         assert "test_fw" in instrumented_frameworks()
 
     def test_reset_clears_everything(self):
-        from agent_observability._state import (
+        from agentsight._state import (
             get_observer,
             initialize,
             is_instrumented,

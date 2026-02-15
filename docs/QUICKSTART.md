@@ -1,34 +1,34 @@
 # Quick Start
 
-Get `agent-observability` running with a single line of code.
+Get `agentsight` running with a single line of code.
 
 ## Installation
 
 **Core SDK** (no framework dependencies):
 
 ```bash
-pip install agent-observability
+pip install agentsight
 ```
 
 **With a specific framework adapter:**
 
 ```bash
-pip install agent-observability[langchain]
-pip install agent-observability[openai-agents]
-pip install agent-observability[crewai]
+pip install agentsight[langchain]
+pip install agentsight[openai-agents]
+pip install agentsight[crewai]
 # ... see full list below
 ```
 
 **With OTLP exporters for production:**
 
 ```bash
-pip install agent-observability[otlp]
+pip install agentsight[otlp]
 ```
 
 **Everything:**
 
 ```bash
-pip install agent-observability[all]
+pip install agentsight[all]
 ```
 
 ### Available Extras
@@ -55,7 +55,7 @@ pip install agent-observability[all]
 ## One-Line Setup (Recommended)
 
 ```python
-from agent_observability import auto_instrument
+from agentsight import auto_instrument
 
 auto_instrument()
 ```
@@ -81,7 +81,7 @@ result = crew.kickoff()
 Only instrument specific frameworks:
 
 ```python
-from agent_observability import auto_instrument
+from agentsight import auto_instrument
 
 auto_instrument(frameworks=["langchain", "anthropic"])
 ```
@@ -89,7 +89,7 @@ auto_instrument(frameworks=["langchain", "anthropic"])
 Or use per-framework functions:
 
 ```python
-from agent_observability import instrument_langchain, instrument_anthropic
+from agentsight import instrument_langchain, instrument_anthropic
 
 instrument_langchain()
 instrument_anthropic()
@@ -98,7 +98,7 @@ instrument_anthropic()
 ### See What's Available
 
 ```python
-from agent_observability import available_frameworks
+from agentsight import available_frameworks
 
 print(available_frameworks())
 # ['langchain', 'anthropic', 'bedrock']  -- only installed frameworks
@@ -109,7 +109,7 @@ print(available_frameworks())
 Send telemetry to an OTLP-compatible backend (Jaeger, Grafana Tempo, Datadog, etc.):
 
 ```python
-from agent_observability import auto_instrument, ExporterType, PayloadPolicy
+from agentsight import auto_instrument, ExporterType, PayloadPolicy
 
 auto_instrument(
     service_name="production-agent",
@@ -132,7 +132,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer token123"
 ```
 
 ```python
-from agent_observability import auto_instrument, ExporterType
+from agentsight import auto_instrument, ExporterType
 
 auto_instrument(exporter=ExporterType.OTLP_GRPC)
 ```
@@ -140,7 +140,7 @@ auto_instrument(exporter=ExporterType.OTLP_GRPC)
 ### Cleanup
 
 ```python
-from agent_observability import uninstrument
+from agentsight import uninstrument
 
 uninstrument()  # Remove all patches and flush telemetry
 ```
@@ -171,8 +171,8 @@ For fine-grained control over what gets traced, use adapters directly instead of
 ### Generic Adapter (Custom Agents)
 
 ```python
-from agent_observability import AgentObserver, init_telemetry, shutdown_telemetry
-from agent_observability.adapters.generic import GenericAgentAdapter
+from agentsight import AgentObserver, init_telemetry, shutdown_telemetry
+from agentsight.adapters.generic import GenericAgentAdapter
 
 # 1. Initialize OpenTelemetry
 tp, mp = init_telemetry(service_name="my-agent-service")
@@ -205,7 +205,7 @@ Each framework has a dedicated adapter. Here are the most common patterns:
 **Callback handlers** (LangChain, LangGraph, LlamaIndex):
 
 ```python
-from agent_observability.adapters.langchain import LangChainAdapter
+from agentsight.adapters.langchain import LangChainAdapter
 
 adapter = LangChainAdapter(observer, agent_id="langchain-agent")
 result = chain.invoke({"input": "What is AI?"}, config={"callbacks": [adapter]})
@@ -214,7 +214,7 @@ result = chain.invoke({"input": "What is AI?"}, config={"callbacks": [adapter]})
 **Context managers** (Anthropic, CrewAI, Haystack, PydanticAI, Phidata):
 
 ```python
-from agent_observability.adapters.anthropic_agents import AgenticLoopAdapter
+from agentsight.adapters.anthropic_agents import AgenticLoopAdapter
 
 adapter = AgenticLoopAdapter(observer, agent_id="claude-agent")
 with adapter.run(task="Research AI") as run:
@@ -226,7 +226,7 @@ with adapter.run(task="Research AI") as run:
 **Async hooks** (OpenAI Agents SDK):
 
 ```python
-from agent_observability.adapters.openai_agents import OpenAIRunHooksAdapter
+from agentsight.adapters.openai_agents import OpenAIRunHooksAdapter
 
 hooks = OpenAIRunHooksAdapter(observer)
 hooks.start_run()
@@ -237,7 +237,7 @@ hooks.end_run(ok=True)
 **Filter registration** (Semantic Kernel):
 
 ```python
-from agent_observability.adapters.semantic_kernel import SKAdapter
+from agentsight.adapters.semantic_kernel import SKAdapter
 
 adapter = SKAdapter(observer, agent_id="sk-agent")
 kernel.add_filter("function_invocation", adapter.function_filter)
@@ -253,7 +253,7 @@ See the [Integration Guide](INTEGRATION_GUIDE.md) for complete before/after exam
 Sensitive data is automatically redacted before reaching any exporter:
 
 ```python
-from agent_observability import AgentObserver, PayloadPolicy
+from agentsight import AgentObserver, PayloadPolicy
 
 observer = AgentObserver(
     payload_policy=PayloadPolicy(

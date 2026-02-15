@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-observability"
+name = "agentsight"
 version = "0.1.0"
 description = "Framework-agnostic agent observability SDK built on OpenTelemetry"
 requires-python = ">=3.10"
@@ -74,11 +74,11 @@ dev = [
     "mypy>=1.8",
 ]
 all = [
-    "agent-observability[otlp,langchain,langgraph,crewai,openai-agents,llamaindex,semantic-kernel,haystack,smolagents,google-adk,pydantic-ai,phidata,dev]",
+    "agentsight[otlp,langchain,langgraph,crewai,openai-agents,llamaindex,semantic-kernel,haystack,smolagents,google-adk,pydantic-ai,phidata,dev]",
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/agent_observability"]
+packages = ["src/agentsight"]
 
 [tool.ruff]
 target-version = "py310"

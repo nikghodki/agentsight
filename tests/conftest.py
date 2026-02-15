@@ -1,5 +1,5 @@
 """
-Shared test fixtures for agent-observability tests.
+Shared test fixtures for agentsight tests.
 
 OTel global providers can only be set once per process. We use session-scoped
 setup for the providers and clear the in-memory exporter before each test.
@@ -22,8 +22,8 @@ from opentelemetry.sdk.trace.export import (
     SpanExportResult,
 )
 
-from agent_observability.observer import AgentObserver
-from agent_observability.redaction import PayloadPolicy
+from agentsight.observer import AgentObserver
+from agentsight.redaction import PayloadPolicy
 
 
 class InMemorySpanExporter(SpanExporter):

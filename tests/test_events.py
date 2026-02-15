@@ -2,7 +2,7 @@
 
 import pytest
 
-from agent_observability.events import (
+from agentsight.events import (
     AgentEvent,
     EventName,
     new_llm_call_id,

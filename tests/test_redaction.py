@@ -2,7 +2,7 @@
 
 import pytest
 
-from agent_observability.redaction import PayloadPolicy, sanitize_attributes
+from agentsight.redaction import PayloadPolicy, sanitize_attributes
 
 
 class TestSanitizeAttributes:

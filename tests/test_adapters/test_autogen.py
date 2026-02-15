@@ -9,8 +9,8 @@ import pytest
 if TYPE_CHECKING:
     from conftest import InMemorySpanExporter
 
-from agent_observability.adapters.autogen import AutoGenAdapter
-from agent_observability.observer import AgentObserver
+from agentsight.adapters.autogen import AutoGenAdapter
+from agentsight.observer import AgentObserver
 
 
 class TestAutoGenAdapter:

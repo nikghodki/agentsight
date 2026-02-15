@@ -10,12 +10,12 @@ import pytest
 if TYPE_CHECKING:
     from conftest import InMemorySpanExporter
 
-from agent_observability.observer import AgentObserver
+from agentsight.observer import AgentObserver
 
 
 class TestGoogleADKAdapter:
     def test_full_run(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.google_adk import GoogleADKAdapter
+        from agentsight.adapters.google_adk import GoogleADKAdapter
 
         adapter = GoogleADKAdapter(observer)
 
@@ -35,7 +35,7 @@ class TestGoogleADKAdapter:
         assert "agent.tool" in span_names
 
     def test_sub_agent_handoff(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.google_adk import GoogleADKAdapter
+        from agentsight.adapters.google_adk import GoogleADKAdapter
 
         adapter = GoogleADKAdapter(observer)
 
@@ -50,7 +50,7 @@ class TestGoogleADKAdapter:
 
 class TestBedrockAgentsAdapter:
     def test_orchestration_trace(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.bedrock_agents import BedrockAgentsAdapter
+        from agentsight.adapters.bedrock_agents import BedrockAgentsAdapter
 
         adapter = BedrockAgentsAdapter(observer, agent_id="bedrock-agent")
 
@@ -99,7 +99,7 @@ class TestBedrockAgentsAdapter:
         assert any(s.name == "agent.tool" for s in spans)
 
     def test_failure_trace(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.bedrock_agents import BedrockAgentsAdapter
+        from agentsight.adapters.bedrock_agents import BedrockAgentsAdapter
 
         adapter = BedrockAgentsAdapter(observer)
 
@@ -119,7 +119,7 @@ class TestBedrockAgentsAdapter:
 
 class TestSmolagentsAdapter:
     def test_context_manager_run(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.smolagents import SmolagentsAdapter
+        from agentsight.adapters.smolagents import SmolagentsAdapter
 
         adapter = SmolagentsAdapter(observer, agent_id="code-agent")
 
@@ -139,7 +139,7 @@ class TestSmolagentsAdapter:
         assert observer.open_span_count == 0
 
     def test_monitor_callback(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.smolagents import SmolagentsAdapter
+        from agentsight.adapters.smolagents import SmolagentsAdapter
 
         adapter = SmolagentsAdapter(observer, agent_id="code-agent")
         monitor = adapter.create_monitor()
@@ -160,7 +160,7 @@ class TestSmolagentsAdapter:
 
 class TestHaystackAdapter:
     def test_pipeline_run(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.haystack import HaystackAdapter
+        from agentsight.adapters.haystack import HaystackAdapter
 
         adapter = HaystackAdapter(observer, agent_id="rag-pipeline")
 
@@ -180,7 +180,7 @@ class TestHaystackAdapter:
         assert any(s.name == "agent.step" for s in spans)
 
     def test_error_in_pipeline(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.haystack import HaystackAdapter
+        from agentsight.adapters.haystack import HaystackAdapter
 
         adapter = HaystackAdapter(observer)
 
@@ -194,7 +194,7 @@ class TestHaystackAdapter:
 
 class TestPydanticAIAdapter:
     def test_full_run(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.pydantic_ai import PydanticAIAdapter
+        from agentsight.adapters.pydantic_ai import PydanticAIAdapter
 
         adapter = PydanticAIAdapter(observer, agent_id="pydantic-agent")
 
@@ -214,7 +214,7 @@ class TestPydanticAIAdapter:
         assert len(tool_spans) == 2
 
     def test_validation_error(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.pydantic_ai import PydanticAIAdapter
+        from agentsight.adapters.pydantic_ai import PydanticAIAdapter
 
         adapter = PydanticAIAdapter(observer, agent_id="test")
 
@@ -227,7 +227,7 @@ class TestPydanticAIAdapter:
 
 class TestPhidataAdapter:
     def test_full_run(self, observer: AgentObserver, span_exporter: InMemorySpanExporter):
-        from agent_observability.adapters.phidata import PhidataAdapter
+        from agentsight.adapters.phidata import PhidataAdapter
 
         adapter = PhidataAdapter(observer, agent_id="research-agent")
 
