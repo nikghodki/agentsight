@@ -33,11 +33,6 @@ agent.run                          # Full agent invocation
         +-- agent.llm
 ```
 
-Demo:
-
-https://github.com/user-attachments/assets/621b4f29-b06f-4fc1-b146-1ea287feae34
-
-
 
 ## Installation
 
