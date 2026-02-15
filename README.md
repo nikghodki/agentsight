@@ -47,13 +47,40 @@ pip install agent-observability[otlp]
 pip install agent-observability[all]
 ```
 
-## Quick Example
+## Quick Start — One Line
+
+```python
+from agent_observability import auto_instrument
+
+auto_instrument()
+
+# Existing code works unchanged — all detected frameworks emit spans automatically.
+chain.invoke({"input": "Hello"})              # LangChain ✓
+await Runner.run(agent, "Hello")              # OpenAI Agents ✓
+client.messages.create(model="...", ...)      # Anthropic ✓
+crew.kickoff()                                # CrewAI ✓
+```
+
+### Selective or Production Setup
+
+```python
+from agent_observability import auto_instrument, ExporterType, PayloadPolicy
+
+auto_instrument(
+    service_name="my-agent",
+    exporter=ExporterType.OTLP_GRPC,
+    otlp_endpoint="http://collector:4317",
+    frameworks=["langchain", "anthropic"],
+    payload_policy=PayloadPolicy(redact_keys={"password", "ssn"}),
+)
+```
+
+### Manual Integration (Full Control)
 
 ```python
 from agent_observability import AgentObserver, init_telemetry, shutdown_telemetry
 from agent_observability.adapters.generic import GenericAgentAdapter
 
-# Initialize OTel (console exporter for development)
 tp, mp = init_telemetry(service_name="my-agent")
 observer = AgentObserver()
 agent = GenericAgentAdapter(observer, agent_id="my-agent")
@@ -150,6 +177,9 @@ The SDK automatically records:
 ```
 src/agent_observability/
   __init__.py          # Public API
+  auto.py              # auto_instrument() orchestration
+  _state.py            # Global singleton (observer, providers)
+  _patch/              # 14 monkey-patch modules (one per framework)
   events.py            # AgentEvent protocol (frozen dataclass)
   observer.py          # OTel bridge (spans + metrics)
   redaction.py         # Payload sanitization
@@ -157,7 +187,7 @@ src/agent_observability/
   adapters/            # 15 framework adapters
 examples/
   demo.py              # Working end-to-end example
-tests/                 # 58 tests
+tests/                 # 85 tests
 docs/
   ARCHITECTURE.md      # Design and internals
   QUICKSTART.md        # Installation and usage guide
@@ -184,6 +214,7 @@ mypy src/
 - **[Integration Guide](docs/INTEGRATION_GUIDE.md)** - Before/after examples for all 15 frameworks (start here)
 - **[Quick Start](docs/QUICKSTART.md)** - Installation, basic usage, and framework-specific examples
 - **[Architecture](docs/ARCHITECTURE.md)** - Three-layer design, span correlation, payload hygiene, data flow
+- **[Landscape Analysis](docs/LANDSCAPE.md)** - How this compares to OpenLLMetry, Langfuse, AgentOps, Opik, MLflow, and others
 
 ## Requirements
 

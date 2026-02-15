@@ -1,10 +1,107 @@
 # Integration Guide
 
-Adding `agent-observability` to existing agent code is a minimal change. Your core agent logic stays untouched -- you wrap it with a few context managers or pass an adapter as a callback.
+Adding `agent-observability` to existing agent code is a minimal change. Your core agent logic stays untouched.
 
-This guide shows **before** and **after** for every supported framework. Lines marked `# <-- NEW` are the only additions.
+This guide covers two integration modes:
+1. **Auto-instrumentation** (one line, zero code changes) -- recommended for most users
+2. **Manual adapter integration** (2-7 lines added, fine-grained control)
 
-## How Invasive Is It?
+---
+
+## Auto-Instrumentation (Recommended)
+
+The fastest way to get started. One function call instruments all detected frameworks:
+
+```python
+from agent_observability import auto_instrument
+
+auto_instrument()
+
+# Your existing code works unchanged — spans are emitted automatically.
+chain.invoke({"input": "Hello"})              # LangChain ✓
+await Runner.run(agent, "Hello")              # OpenAI Agents ✓
+client.messages.create(model="...", ...)      # Anthropic ✓
+crew.kickoff()                                # CrewAI ✓
+```
+
+### Selective Instrumentation
+
+Instrument only specific frameworks:
+
+```python
+from agent_observability import auto_instrument
+
+auto_instrument(frameworks=["langchain", "anthropic"])
+```
+
+Or use per-framework functions:
+
+```python
+from agent_observability import instrument_langchain, instrument_anthropic
+
+instrument_langchain()
+instrument_anthropic()
+```
+
+### Configuration Options
+
+```python
+from agent_observability import auto_instrument
+from agent_observability import ExporterType, PayloadPolicy
+
+results = auto_instrument(
+    service_name="my-agent-service",
+    exporter=ExporterType.OTLP_GRPC,
+    otlp_endpoint="http://collector:4317",
+    payload_policy=PayloadPolicy(redact_keys={"password", "ssn"}),
+)
+
+# results = {"langchain": True, "anthropic": True, "crewai": False, ...}
+```
+
+### Supported Frameworks
+
+| Framework | Import Probe | What Gets Patched |
+|---|---|---|
+| **LangChain** | `langchain_core` | `Runnable.invoke()`, `Runnable.ainvoke()` |
+| **LangGraph** | `langgraph` | `CompiledGraph.invoke()`, `CompiledGraph.ainvoke()` |
+| **OpenAI Agents** | `agents` | `Runner.run()` |
+| **Anthropic** | `anthropic` | `Messages.create()`, `AsyncMessages.create()` |
+| **CrewAI** | `crewai` | `Crew.kickoff()`, `Crew.kickoff_async()` |
+| **AutoGen** | `autogen` | `ConversableAgent.initiate_chat()` |
+| **LlamaIndex** | `llama_index.core` | `Settings.callback_manager` |
+| **Semantic Kernel** | `semantic_kernel` | `Kernel.invoke()` |
+| **Google ADK** | `google.adk` | `Runner.run_async()` |
+| **Bedrock Agents** | `botocore` | `InvokeAgent` API call |
+| **Haystack** | `haystack` | `Pipeline.run()` |
+| **smolagents** | `smolagents` | `CodeAgent.run()` |
+| **PydanticAI** | `pydantic_ai` | `Agent.run_sync()`, `Agent.run()` |
+| **Phidata** | `phi` | `Agent.run()`, `Agent.print_response()` |
+
+### Cleanup
+
+```python
+from agent_observability import uninstrument
+
+uninstrument()  # Remove all patches and flush telemetry
+```
+
+### Discover Available Frameworks
+
+```python
+from agent_observability import available_frameworks
+
+print(available_frameworks())
+# ['langchain', 'anthropic', 'bedrock']  -- only installed ones
+```
+
+---
+
+## Manual Integration (Fine-Grained Control)
+
+For deeper control over what gets traced, use the adapters directly. This guide shows **before** and **after** for every supported framework. Lines marked `# <-- NEW` are the only additions.
+
+### How Invasive Is It?
 
 | Integration Mode | Lines Added | Logic Changes | Framework Examples |
 |---|---|---|---|
@@ -15,11 +112,9 @@ This guide shows **before** and **after** for every supported framework. Lines m
 
 In all cases: **zero changes to your agent's core logic**. The observability layer is purely additive.
 
----
+### Common Setup (All Frameworks)
 
-## Common Setup (All Frameworks)
-
-Every integration starts with the same 3 lines:
+Every manual integration starts with the same 3 lines:
 
 ```python
 from agent_observability import AgentObserver, init_telemetry, shutdown_telemetry
